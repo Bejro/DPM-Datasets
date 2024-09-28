@@ -23,17 +23,6 @@ SAVE_DIR = Path(__file__).parent.parent / 'src/checkpoints'
 RESULT_DIR = Path(__file__).parent.parent / 'results'
 
 
-def get_path(x: List[str]) -> Path:
-    return Path('train/' + '/'.join(x) + '.dcm')
-
-
-def get_arr(archive: ZipFile, path: Union[Path, str]) -> np.ndarray:
-    imgdata = archive.open(path)
-    dcm = dicom.dcmread(imgdata)
-    arr = dcm.RescaleSlope * dcm.pixel_array + dcm.RescaleIntercept
-    return arr.clip(*CONFIG.img_window)
-
-
 def _diffuse_and_step(diffusion: Diffusion, model: Autoencoder, optimizer: optim, images, labels) -> torch.Tensor:
 
     a = diffusion.sample_angles(images.shape[0]).to(model.device)
@@ -156,11 +145,9 @@ def log_reco_results(
         epoch: int, losses: List[Union[float, torch.Tensor]]
 ) -> None:
     save_dir = SAVE_DIR / CONFIG.experiment_name
-    results_dir = SAVE_DIR / CONFIG.experiment_name
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
+    results_dir = RESULT_DIR / CONFIG.experiment_name
+    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(save_dir, exist_ok=True)
 
     if ema_model is not None:
         model = ema_model

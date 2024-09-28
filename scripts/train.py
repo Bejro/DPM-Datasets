@@ -4,17 +4,14 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
-import csv
 from tqdm import tqdm
 import torchvision
 from torch import optim
 import torch
-import torch.nn.functional as F
-import zipfile
 from functools import partial
 
-from scripts.training_tools import train, log_reco_results, get_path, get_arr
-from src.utils import ImageLoader
+from scripts.training_tools import train, log_reco_results
+from src.utils import ImageLoader, load_data
 from src.diffusion import Diffusion
 from src.models import Autoencoder
 from scripts.configs import TrainConfig
@@ -27,32 +24,15 @@ if CONFIG.device_id is not None:
     os.environ["CUDA_VISIBLE_DEVICES"] = CONFIG.device_id
 
 
-def load_data(
-        begin: Optional[int] = None, end: Optional[int] = None, img_res: Optional[int] = None
-) -> Tuple[torch.Tesnor, torch.Tensor]:
+def load_data_for_training(
+        begin: Optional[int] = None, end: Optional[int] = None, org_res: Optional[int] = None
+) -> Tuple[torch.Tesnor, ...]:
     begin = begin or CONFIG.ds_id_first
     end = end or CONFIG.ds_id_last
-    img_res = img_res or CONFIG.img_res
+    org_res = org_res or CONFIG.img_res
 
-    archive = zipfile.ZipFile(CONFIG.ds_path, 'r')
-    x_path = []
-
-    with open(CONFIG.ds_meta, newline='') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        next(reader)
-        for row in tqdm(reader):
-            x_path.append(row[:3])
-    ds = torch.zeros(end - begin, img_res, img_res)
-    for i, j in tqdm(enumerate(range(begin, end))):
-        path = get_path(x_path[j])
-        img = get_arr(archive, path)
-        assert img.shape == (img_res, img_res)
-        ds[i] = torch.tensor(img)
-
-    ds128 = F.interpolate(ds.unsqueeze(1), size=128, mode='nearest')
-    ds256 = F.interpolate(ds.unsqueeze(1), size=256, mode='nearest')
-
-    return ds128, ds256
+    res = [load_data(CONFIG.ds_path, CONFIG.ds_meta, begin, end, org_res, px)[0] for px in [128, 256]]
+    return tuple(res)
 
 
 def init_models(images: torch.Tensor) -> (Autoencoder, Autoencoder, Diffusion):
@@ -217,7 +197,7 @@ def main():
     print(config)
     CONFIG = config
 
-    ds_128, ds_256 = load_data()
+    ds_128, ds_256 = load_data_for_training()
     model_small, model_big, diffusion = init_models(ds_128)
     train_big_model(diffusion, model_big, model_small, ds_128, ds_256)
 

@@ -94,8 +94,8 @@ class Diffusion:
 
     def sample(
             self,
-            model: Autoencoder, n: int, images: Optional[torch.Tensor] = None, labels: Optional[torch.Tensor]=None,
-            cfg_scale: int = 3, angle_step: int = 1, noise_retention: float = 0.5,
+            model: Autoencoder, n: int, images: Optional[torch.Tensor] = None, labels: Optional[torch.Tensor] = None,
+            cfg_scale: float = 3, angle_step: int = 1, noise_retention: float = 0.5,
             init_angle: int = 3, skip_last_angles: int = 0
     ) -> np.ndarray:
         model.eval()
