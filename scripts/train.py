@@ -10,7 +10,7 @@ from torch import optim
 import torch
 from functools import partial
 
-from scripts.training_tools import train, log_reco_results
+from src.training_tools import train, log_reco_results
 from src.utils import ImageLoader, load_data, get_codes
 from src.diffusion import Diffusion
 from src.models import Autoencoder
@@ -206,6 +206,7 @@ def main():
     train_big_model(diffusion, model_big, model_small, ds_128, ds_256)
     print('Training finished, extracting codes for a later use...')
     extract_codes(model_big, diffusion, ds_256)
+
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,9 @@
 import os
 from pathlib import Path
 from typing import Optional, Union, List, Any
-from zipfile import ZipFile
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pydicom as dicom
 from tqdm import tqdm
 from copy import deepcopy
 import torchvision

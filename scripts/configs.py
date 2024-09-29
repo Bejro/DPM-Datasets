@@ -43,3 +43,12 @@ class InferenceConfig(Config):
     generation_batch_size: int = 100
     imgs_per_file: int = 5000
     sample_threshold: int = 0.41
+
+
+@attr.define(auto_attribs=True)
+class EvalConfig(Config):
+    ds_id_first: int = 400000
+    ds_id_last: int = 600000
+    val_id_first: int = 600000
+    val_id_last: int = 650000
+    num_classifiers: int = 10

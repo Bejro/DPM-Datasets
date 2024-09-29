@@ -34,6 +34,20 @@ class EMA:
         ema_model.load_state_dict(model.state_dict())
 
 
+class ClassifierWrap(nn.Module):
+    def __init__(self, core, emb_dim, n_out):
+        super().__init__()
+
+        self.core = core
+        self.dense = nn.Linear(emb_dim, n_out)
+
+    def forward(self, x):
+        x = self.core(x)
+        x = F.silu(x)
+        x = self.dense(x)
+        return x
+
+
 class Autoencoder(nn.Module):
     def __init__(
             self,
