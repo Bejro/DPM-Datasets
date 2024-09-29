@@ -11,13 +11,14 @@ import torch
 from functools import partial
 
 from scripts.training_tools import train, log_reco_results
-from src.utils import ImageLoader, load_data
+from src.utils import ImageLoader, load_data, get_codes
 from src.diffusion import Diffusion
 from src.models import Autoencoder
 from scripts.configs import TrainConfig
 
 CONFIG = TrainConfig
 DEVICE = CONFIG.device
+RESULT_DIR = Path(__file__).parent.parent / 'results'
 
 if CONFIG.device_id is not None:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -136,6 +137,11 @@ def train_big_model(
     )
 
 
+def extract_codes(model: Autoencoder, diffusion: Diffusion, ds: torch.Tensor):
+    codes = get_codes(model, diffusion, ds, CONFIG.batch_256)
+    torch.save(codes, RESULT_DIR / 'training_codes.pt')
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Training script arguments")
 
@@ -193,14 +199,13 @@ def main():
         final_training_epochs=args.final_training_epochs,
         state_dict_128_path=args.state_dict_128_path
     )
-
-    print(config)
     CONFIG = config
 
     ds_128, ds_256 = load_data_for_training()
     model_small, model_big, diffusion = init_models(ds_128)
     train_big_model(diffusion, model_big, model_small, ds_128, ds_256)
-
+    print('Training finished, extracting codes for a later use...')
+    extract_codes(model_big, diffusion, ds_256)
 
 if __name__ == "__main__":
     main()

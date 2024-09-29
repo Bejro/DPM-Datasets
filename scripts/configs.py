@@ -40,3 +40,6 @@ class InferenceConfig(Config):
     sampling_steps: int = 2
     kde_bandwidth: float = 0.07
     noise_retention_share: float = 0.65
+    generation_batch_size: int = 100
+    imgs_per_file: int = 5000
+    sample_threshold: int = 0.41
