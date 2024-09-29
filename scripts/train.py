@@ -22,12 +22,12 @@ RESULT_DIR = Path(__file__).parent.parent / 'results'
 
 if CONFIG.device_id is not None:
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = CONFIG.device_id
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(CONFIG.device_id)
 
 
 def load_data_for_training(
         begin: Optional[int] = None, end: Optional[int] = None, org_res: Optional[int] = None
-) -> Tuple[torch.Tesnor, ...]:
+) -> Tuple[torch.Tensor, ...]:
     begin = begin or CONFIG.ds_id_first
     end = end or CONFIG.ds_id_last
     org_res = org_res or CONFIG.img_res
@@ -142,63 +142,14 @@ def extract_codes(model: Autoencoder, diffusion: Diffusion, ds: torch.Tensor):
     torch.save(codes, RESULT_DIR / 'training_codes.pt')
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Training script arguments")
-
-    # Adding arguments that match TrainConfig
-    parser.add_argument('--ds_meta', type=Path, required=True, help="Path to dataset metadata")
-    parser.add_argument('--ds_path', type=Path, required=True, help="Path to dataset")
-    parser.add_argument('--device_id', type=str, default=None, help="Device ID to use (Optional)")
-    parser.add_argument('--device', type=str, default='cuda', help="Device to use (default: cuda)")
-    parser.add_argument('--img_window', type=int, nargs=2, default=(-1000, 3000),
-                        help="Image window for processing (default: (-1000, 3000))")
-    parser.add_argument('--use_blur', type=bool, default=True,
-                        help="Whether to use blur in preprocessing (default: True)")
-    parser.add_argument('--experiment_name', type=str, default="with_blur",
-                        help="Name of the experiment (default: with_blur)")
-    parser.add_argument('--ds_id_first', type=int, default=0, help="First dataset ID (default: 0)")
-    parser.add_argument('--ds_id_last', type=int, default=200000, help="Last dataset ID (default: 200000)")
-    parser.add_argument('--img_res', type=int, default=512, help="Image resolution (default: 512)")
-    parser.add_argument('--batch_128', type=int, default=32, help="Batch size for 128 resolution images (default: 32)")
-    parser.add_argument('--batch_256', type=int, default=32, help="Batch size for 256 resolution images (default: 32)")
-    parser.add_argument('--lr_128', type=float, default=0.00001,
-                        help="Learning rate for 128 resolution images (default: 0.00001)")
-    parser.add_argument('--lr_256', type=float, default=0.00001,
-                        help="Learning rate for 256 resolution images (default: 0.00001)")
-    parser.add_argument('--small_model_epochs', type=int, default=5,
-                        help="Number of epochs for the small model (default: 5)")
-    parser.add_argument('--final_training_epochs', type=int, default=2,
-                        help="Number of epochs for final training (default: 2)")
-    parser.add_argument('--state_dict_128_path', type=Path,
-                        default=Path(__file__).parent.parent / 'src/checkpoints/small_model_final.pt',
-                        help="Path to small model checkpoint (default: src/checkpoints/small_model_final.pt)")
-
-    return parser.parse_args()
-
-
 def main():
     global CONFIG
-    args = parse_args()
+    parser = argparse.ArgumentParser(description="Inference script for sampling artificial images")
+    parser.add_argument('--ds_path', type=Path, required=True, help="Path to the dataset")
+    parser.add_argument('--ds_meta', type=Path, required=True, help="Path to the dataset metadata")
 
-    config = TrainConfig(
-        ds_meta=args.ds_meta,
-        ds_path=args.ds_path,
-        device_id=args.device_id,
-        device=args.device,
-        img_window=(args.img_window[0], args.img_window[1]),
-        use_blur=args.use_blur,
-        experiment_name=args.experiment_name,
-        ds_id_first=args.ds_id_first,
-        ds_id_last=args.ds_id_last,
-        img_res=args.img_res,
-        batch_128=args.batch_128,
-        batch_256=args.batch_256,
-        lr_128=args.lr_128,
-        lr_256=args.lr_256,
-        small_model_epochs=args.small_model_epochs,
-        final_training_epochs=args.final_training_epochs,
-        state_dict_128_path=args.state_dict_128_path
-    )
+    args = parser.parse_args()
+    config = TrainConfig(**vars(args))
     CONFIG = config
 
     ds_128, ds_256 = load_data_for_training()

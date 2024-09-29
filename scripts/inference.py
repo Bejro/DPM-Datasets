@@ -14,6 +14,11 @@ from src.models import Autoencoder
 from src.utils import load_data, generate_images, RejectionSampling
 
 RESULT_DIR = Path(__file__).parent.parent / 'results'
+CONFIG = InferenceConfig(Path(), Path())
+
+if CONFIG.device_id is not None:
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(CONFIG.device_id)
 
 
 def load_model(config: InferenceConfig) -> Autoencoder:

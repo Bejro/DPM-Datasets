@@ -42,7 +42,7 @@ def _diffuse_and_step(diffusion: Diffusion, model: Autoencoder, optimizer: optim
 
 def train_modules(
         diffusion: Diffusion, model: Autoencoder, optimizer: optim,
-        images: torch.Tensor, labels: Optional[torch.Tenosr] = None,
+        images: torch.Tensor, labels: Optional[torch.Tensor] = None,
         encoder: bool = True, decoder: bool = True
 ) -> torch.Tensor:
     def _train_on_batch(

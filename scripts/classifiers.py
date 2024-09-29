@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 import torch
@@ -9,6 +10,11 @@ from src.classifier_tools import BestSaver, make_classifier, train_new_model
 from src.utils import load_data
 
 RESULT_DIR = Path(__file__).parent.parent / 'results'
+CONFIG = EvalConfig(Path(), Path())
+
+if CONFIG.device_id is not None:
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(CONFIG.device_id)
 
 
 def get_new_shuffled_data(images, labels, num_pos, num_neg) -> (torch.Tensor, torch.Tensor):
