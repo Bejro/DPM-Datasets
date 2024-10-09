@@ -65,26 +65,13 @@ def train_small_model(
 
 
 def prepare_labels_dataloader(
-        diffusion: Diffusion, small_model: Autoencoder, ds128: torch.Tensor, ds256: torch.Tensor
+        diffusion: Diffusion, small_model: Autoencoder, ds_128: torch.Tensor, ds256: torch.Tensor
 ) -> ImageLoader:
-    dataloader_imgs = ImageLoader(ds128, batch_size=CONFIG.batch_128)
-    labels = []
-    small_model.eval()
-    with torch.no_grad():
-        for imgs in tqdm(dataloader_imgs):
-            imgs_n = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(imgs)
-            label_batch = small_model.classif(imgs_n.to(small_model.device)).cpu().numpy()
-            labels.extend(label_batch)
-
-    labels_set = np.array(labels)
-    labels_set = torch.Tensor(labels_set)
-
+    labels_set = get_codes(small_model, diffusion, ds_128, CONFIG.batch_128)
     rand_order = torch.randperm(len(ds256))
     ds_shuffled = ds256[rand_order]
     labels_shuffled = labels_set[rand_order]
-
     dataloader = ImageLoader(ds_shuffled, labels_shuffled, batch_size=CONFIG.batch_256)
-
     return dataloader
 
 

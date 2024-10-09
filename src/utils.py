@@ -70,18 +70,15 @@ def get_codes(
         model: Autoencoder, diffusion: Diffusion, ds: torch.Tensor, batch_size: int
 ) -> torch.Tensor:
     dataloader = ImageLoader(ds, batch_size=batch_size)
-    codes = torch.zeros(len(ds), 512)
-    c = 0
+    codes_list = []
+    model.eval()
     with torch.no_grad():
-        for batch in tqdm(dataloader):
-            img = batch[0]
-            if len(img) == 0:
-                continue
+        for img in tqdm(dataloader):
             img = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(img).to(model.device)
             code = model.classif(img)
-            codes[c:c + len(code)] = code
-            c += len(code)
-
+            codes_list.extend(code.cpu().numpy())
+    codes_arr = np.array(codes_list)
+    codes = torch.Tensor(codes_arr)
     return codes
 
 
