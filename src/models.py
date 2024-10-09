@@ -66,9 +66,6 @@ class Autoencoder(nn.Module):
             labels = self.classif(support)
         return self.unet(x, t, labels)
 
-    def device(self) -> torch.device:
-        return self.device
-
 
 class SelfAttentionGate(nn.Module):
     def __init__(self, filters: int):

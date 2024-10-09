@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ RESULT_DIR = Path(__file__).parent.parent / 'results'
 def _diffuse_and_step(
         diffusion: Diffusion, model: Autoencoder, optimizer: optim,
         images: torch.Tensor, labels: torch.Tensor, device: Union[torch.device, str] = 'cuda'
-) -> torch.Tensor:
+) -> float:
 
     a = diffusion.sample_angles(images.shape[0]).to(device)
     if CONFIG.use_blur:
@@ -40,17 +40,17 @@ def _diffuse_and_step(
     loss.backward()
     optimizer.step()
 
-    return loss.item()
+    return float(loss.item())
 
 
 def train_modules(
         diffusion: Diffusion, model: Autoencoder, optimizer: optim,
         images: torch.Tensor, labels: Optional[torch.Tensor] = None,
         encoder: bool = True, decoder: bool = True
-) -> torch.Tensor:
-    device = model.device()
+) -> float:
+    device = model.device
 
-    def _train_on_batch():
+    def _train_on_batch() -> float:
         nonlocal images
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)
         images = images.to(device)
@@ -62,7 +62,7 @@ def train_modules(
                 torch.randn(len(images), 512).to(device) / 100 if np.random.random() < 0.5 else 0)
         return _diffuse_and_step(diffusion, model, optimizer, images, labels)
 
-    def _train_u_on_batch():
+    def _train_u_on_batch() -> float:
         nonlocal images
         nonlocal labels
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)
@@ -75,7 +75,7 @@ def train_modules(
             labels = labels + (torch.randn(len(images), 512).to(device) / 100 if np.random.random() < 0.5 else 0)
         return _diffuse_and_step(diffusion, model, optimizer, images, labels)
 
-    def _train_c_on_batch():
+    def _train_c_on_batch() -> float:
         nonlocal images
         nonlocal labels
         mse = nn.MSELoss()
@@ -89,7 +89,7 @@ def train_modules(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        return loss.item()
+        return float(loss.item())
 
     if encoder and decoder:
         return _train_on_batch()
@@ -104,8 +104,9 @@ def train_modules(
 def train(
         diffusion: Diffusion, model: Autoencoder, loader: ImageLoader, opt: optim, epochs: int,
         encoder: bool = True, decoder: bool = True,
-        use_ema=False, is_supervised=False, logging_fc=None
-):
+        use_ema: bool = False, is_supervised: bool = False,
+        logging_fc: Optional[Callable[[Autoencoder, Autoencoder, int, List[float]], None]] = None
+) -> None:
     losses = []
     pbar = tqdm(loader)
 

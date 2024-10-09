@@ -57,7 +57,7 @@ def train_small_model(
     train(
         diffusion, small_model, dataloader, optimizer, CONFIG.small_model_epochs,
         use_ema=True, is_supervised=False,
-        logging_fc=partial(log_reco_results, 'small_model', vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='small_model', imgs=vis_ex_imgs)
     )
     state_dict_128_path = CONFIG.small_model_checkpoint
     torch.save(small_model.state_dict(), state_dict_128_path)
@@ -103,7 +103,7 @@ def pretrain_big_model(
     train(
         diffusion, big_model, supervised_dataloader, optimizer, epochs=1,
         encoder=False, use_ema=True, is_supervised=True,
-        logging_fc=partial(log_reco_results, save_name='big_fixed', imgs=vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='big_fixed', imgs=vis_ex_imgs)
     )
 
     print('Fitting semantic encoder...')
@@ -127,7 +127,7 @@ def fine_tune_big_model(
     train(
         diffusion, big_model, dataloader_256, optimizer, epochs=CONFIG.final_training_epochs,
         use_ema=True, is_supervised=False,
-        logging_fc=partial(log_reco_results, 'big_freed', vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='big_freed', imgs=vis_ex_imgs)
     )
     state_dict_fine_tuned_path = CONFIG.big_model_pretrained_checkpoint
     torch.save(big_model.state_dict(), state_dict_fine_tuned_path)
@@ -149,7 +149,7 @@ def main():
     parser.add_argument('--fine_tune_big', action='store_true', help="Fine-tune the big model")
 
     args = parser.parse_args()
-    config = TrainConfig(**vars(args))
+    config = TrainConfig(ds_path=args.ds_path, ds_meta=args.ds_meta)
     CONFIG = config
 
     ds_128, ds_256 = load_data_for_training()
