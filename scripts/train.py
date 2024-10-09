@@ -57,7 +57,7 @@ def train_small_model(
     train(
         diffusion, small_model, dataloader, optimizer, CONFIG.small_model_epochs,
         use_ema=True, is_supervised=False,
-        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='small_model', imgs=vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion, 'small_model', vis_ex_imgs)
     )
     state_dict_128_path = CONFIG.small_model_checkpoint
     torch.save(small_model.state_dict(), state_dict_128_path)
@@ -73,7 +73,7 @@ def prepare_labels_dataloader(
     with torch.no_grad():
         for imgs in tqdm(dataloader_imgs):
             imgs_n = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(imgs)
-            label_batch = small_model.classif(imgs_n.to(small_model.device())).cpu().numpy()
+            label_batch = small_model.classif(imgs_n.to(small_model.device)).cpu().numpy()
             labels.extend(label_batch)
 
     labels_set = np.array(labels)
@@ -103,7 +103,7 @@ def pretrain_big_model(
     train(
         diffusion, big_model, supervised_dataloader, optimizer, epochs=1,
         encoder=False, use_ema=True, is_supervised=True,
-        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='big_fixed', imgs=vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion, 'big_fixed', vis_ex_imgs)
     )
 
     print('Fitting semantic encoder...')
@@ -127,7 +127,7 @@ def fine_tune_big_model(
     train(
         diffusion, big_model, dataloader_256, optimizer, epochs=CONFIG.final_training_epochs,
         use_ema=True, is_supervised=False,
-        logging_fc=partial(log_reco_results, diffusion=diffusion, save_name='big_freed', imgs=vis_ex_imgs)
+        logging_fc=partial(log_reco_results, diffusion, 'big_freed', vis_ex_imgs)
     )
     state_dict_fine_tuned_path = CONFIG.big_model_pretrained_checkpoint
     torch.save(big_model.state_dict(), state_dict_fine_tuned_path)

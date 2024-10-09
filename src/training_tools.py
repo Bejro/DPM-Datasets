@@ -16,7 +16,7 @@ from src.models import EMA, Autoencoder
 from scripts.configs import TrainConfig
 from src.utils import ImageLoader
 
-CONFIG = TrainConfig
+CONFIG = TrainConfig(Path(), Path())
 SAVE_DIR = Path(__file__).parent.parent / 'src/checkpoints'
 RESULT_DIR = Path(__file__).parent.parent / 'results'
 
@@ -108,8 +108,6 @@ def train(
         logging_fc: Optional[Callable[[Autoencoder, Autoencoder, int, List[float]], None]] = None
 ) -> None:
     losses = []
-    pbar = tqdm(loader)
-
     ema = None
     ema_model = None
     if use_ema:
@@ -117,6 +115,7 @@ def train(
         ema_model = deepcopy(model).eval().requires_grad_(False)
 
     for epoch in range(epochs):
+        pbar = tqdm(loader, desc=f'Epoch {epoch + 1}/{epochs}')
         for i, batch in enumerate(pbar):
 
             if not is_supervised:
