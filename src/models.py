@@ -55,7 +55,7 @@ class Autoencoder(nn.Module):
             device: Union[torch.device, str]
     ) -> None:
         super().__init__()
-
+        self.device = torch.device(device)
         self.unet = UnetConditional(f_unet, blocks, time_dim=emb_dim, c_in=1, c_out=1).to(device)
         self.classif = Classifier(px, f_classif, blocks, n_out=emb_dim, c_in=1).to(device)
 
@@ -65,6 +65,9 @@ class Autoencoder(nn.Module):
         else:
             labels = self.classif(support)
         return self.unet(x, t, labels)
+
+    def device(self) -> torch.device:
+        return self.device
 
 
 class SelfAttentionGate(nn.Module):

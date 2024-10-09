@@ -112,7 +112,7 @@ def generate_images(
             else:
                 labels = labels[:n_to_gen]
             new_generated = diffusion.sample(
-                model, n=n_to_gen, cfg_scale=config.cfg_scale, angle_step=config.sampling_steps,
+                model, n=n_to_gen, cfg_scale=config.cfg_scale, angle_step=config.sampling_step,
                 labels=labels, noise_retention=config.noise_retention_share
             )
             images[i:i + gen_batch_size] = new_generated

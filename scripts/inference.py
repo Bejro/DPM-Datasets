@@ -23,7 +23,7 @@ if CONFIG.device_id is not None:
 
 def load_model(config: InferenceConfig) -> Autoencoder:
     model = Autoencoder(256, [64, 128, 256, 512, 1024], [32, 64, 128, 256, 512], 3, 512, config.device)
-    model.load_state_dict(torch.load(config.state_dict_256_path))
+    model.load_state_dict(torch.load(config.big_model_fine_tuned_checkpoint))
     model.eval()
     return model
 

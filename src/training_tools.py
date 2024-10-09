@@ -46,8 +46,10 @@ def _diffuse_and_step(
 def train_modules(
         diffusion: Diffusion, model: Autoencoder, optimizer: optim,
         images: torch.Tensor, labels: Optional[torch.Tensor] = None,
-        encoder: bool = True, decoder: bool = True, device: Union[torch.device, str] = 'cuda'
+        encoder: bool = True, decoder: bool = True
 ) -> torch.Tensor:
+    device = model.device()
+
     def _train_on_batch():
         nonlocal images
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)

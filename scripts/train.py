@@ -39,7 +39,6 @@ def load_data_for_training(
 
 
 def init_models(images: torch.Tensor) -> (Autoencoder, Autoencoder, Diffusion):
-
     model_128 = Autoencoder(128, [64, 128, 256, 512, 1024], [32, 64, 128, 256, 512], 3, 512, DEVICE)
     model_256 = Autoencoder(256, [64, 128, 256, 512, 1024], [32, 64, 128, 256, 512], 3, 512, DEVICE)
 
@@ -50,22 +49,19 @@ def init_models(images: torch.Tensor) -> (Autoencoder, Autoencoder, Diffusion):
     return model_128, model_256, diffusion
 
 
-def prepare_or_train_small_model(
+def train_small_model(
         diffusion: Diffusion, small_model: Autoencoder, dataloader: ImageLoader, vis_ex_imgs: torch.Tensor
 ) -> None:
+    print('Training small model...')
     optimizer = optim.AdamW(small_model.parameters(), lr=CONFIG.lr_128)
-
-    state_dict_128_path = CONFIG.state_dict_128_path
-    if state_dict_128_path is not None:
-        small_model.load_state_dict(torch.load(state_dict_128_path))
-        print('Small model loaded from ckpt.')
-    else:
-        print('training small model...')
-        train(
-            diffusion, small_model, dataloader, optimizer, CONFIG.small_model_epochs,
-            use_ema=True, is_supervised=False,
-            logging_fc=partial(log_reco_results, 'small_model', vis_ex_imgs)
-        )
+    train(
+        diffusion, small_model, dataloader, optimizer, CONFIG.small_model_epochs,
+        use_ema=True, is_supervised=False,
+        logging_fc=partial(log_reco_results, 'small_model', vis_ex_imgs)
+    )
+    state_dict_128_path = CONFIG.small_model_checkpoint
+    torch.save(small_model.state_dict(), state_dict_128_path)
+    print(f'Small model saved to {state_dict_128_path}')
 
 
 def prepare_labels_dataloader(
@@ -77,7 +73,7 @@ def prepare_labels_dataloader(
     with torch.no_grad():
         for imgs in tqdm(dataloader_imgs):
             imgs_n = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(imgs)
-            label_batch = small_model.classif(imgs_n.to('cuda')).cpu().numpy()
+            label_batch = small_model.classif(imgs_n.to(small_model.device())).cpu().numpy()
             labels.extend(label_batch)
 
     labels_set = np.array(labels)
@@ -92,49 +88,50 @@ def prepare_labels_dataloader(
     return dataloader
 
 
-def train_big_model(
-        diffusion: Diffusion, big_model: Autoencoder, small_model: Autoencoder, ds128: torch.Tensor, ds256: torch.Tensor
+def pretrain_big_model(
+        diffusion: Diffusion, big_model: Autoencoder, small_model: Autoencoder,
+        ds_128: torch.Tensor, ds_256: torch.Tensor, vis_ex_imgs: torch.Tensor
 ) -> None:
-    rand_order = torch.randperm(len(ds256))
-    progress_visualisation_examples = {"small": ds128[rand_order], "big": ds256[rand_order]}
+    print('Label extraction...')
+    supervised_dataloader = prepare_labels_dataloader(diffusion, small_model, ds_128, ds_256)
 
-    ds_shuffled = ds128[rand_order]
-    dataloader_128 = ImageLoader(ds_shuffled, batch_size=CONFIG.batch_128)
+    print('Pretraining bigger model...')
 
-    print('Small model preparation.')
-    prepare_or_train_small_model(diffusion, small_model, dataloader_128, progress_visualisation_examples["small"])
-
-    print('label_extraction...')
-    supervised_dataloader = prepare_labels_dataloader(diffusion, small_model, ds128, ds256)
-
-    print('training bigger model...')
-
-    print('fitting DPM decoder...')
+    print('Fitting DPM decoder...')
     optimizer = optim.AdamW(big_model.unet.parameters(), lr=CONFIG.lr_256)
     diffusion.img_size = 256
     train(
         diffusion, big_model, supervised_dataloader, optimizer, epochs=1,
         encoder=False, use_ema=True, is_supervised=True,
-        logging_fc=partial(log_reco_results, save_name='big_fixed', imgs=progress_visualisation_examples["big"])
+        logging_fc=partial(log_reco_results, save_name='big_fixed', imgs=vis_ex_imgs)
     )
 
-    print('fitting semantic encoder...')
+    print('Fitting semantic encoder...')
     optimizer = optim.AdamW(big_model.classif.parameters(), lr=CONFIG.lr_256)
     train(
         diffusion, big_model, supervised_dataloader, optimizer,  epochs=1,
         decoder=False, use_ema=False, is_supervised=True, logging_fc=None
     )
+    state_dict_pretrained_path = CONFIG.big_model_pretrained_checkpoint
+    torch.save(big_model.state_dict(), state_dict_pretrained_path)
+    print(f'Pretrained big model saved to {state_dict_pretrained_path}')
 
-    print('end to end')
 
+def fine_tune_big_model(
+        diffusion: Diffusion, big_model: Autoencoder, ds_256: torch.Tensor, vis_ex_imgs: torch.Tensor
+) -> None:
+    print('Fine-tuning big model...')
     optimizer = optim.AdamW(big_model.parameters(), lr=CONFIG.lr_256)
-    dataloader_256 = ImageLoader(ds_shuffled, batch_size=CONFIG.batch_256)
+    dataloader_256 = ImageLoader(ds_256, batch_size=CONFIG.batch_256)
 
     train(
         diffusion, big_model, dataloader_256, optimizer, epochs=CONFIG.final_training_epochs,
         use_ema=True, is_supervised=False,
-        logging_fc=partial(log_reco_results, 'big_freed', progress_visualisation_examples["big"])
+        logging_fc=partial(log_reco_results, 'big_freed', vis_ex_imgs)
     )
+    state_dict_fine_tuned_path = CONFIG.big_model_pretrained_checkpoint
+    torch.save(big_model.state_dict(), state_dict_fine_tuned_path)
+    print(f'Fine-tuned big model saved to {state_dict_fine_tuned_path}')
 
 
 def extract_codes(model: Autoencoder, diffusion: Diffusion, ds: torch.Tensor):
@@ -144,9 +141,12 @@ def extract_codes(model: Autoencoder, diffusion: Diffusion, ds: torch.Tensor):
 
 def main():
     global CONFIG
-    parser = argparse.ArgumentParser(description="Inference script for sampling artificial images")
+    parser = argparse.ArgumentParser(description="Training script for autoencoder models")
     parser.add_argument('--ds_path', type=Path, required=True, help="Path to the dataset")
     parser.add_argument('--ds_meta', type=Path, required=True, help="Path to the dataset metadata")
+    parser.add_argument('--train_small', action='store_true', help="Train the small model")
+    parser.add_argument('--pretrain_big', action='store_true', help="Pretrain the big model")
+    parser.add_argument('--fine_tune_big', action='store_true', help="Fine-tune the big model")
 
     args = parser.parse_args()
     config = TrainConfig(**vars(args))
@@ -154,9 +154,28 @@ def main():
 
     ds_128, ds_256 = load_data_for_training()
     model_small, model_big, diffusion = init_models(ds_128)
-    train_big_model(diffusion, model_big, model_small, ds_128, ds_256)
-    print('Training finished, extracting codes for a later use...')
-    extract_codes(model_big, diffusion, ds_256)
+
+    rand_order = torch.randperm(len(ds_256))[:4]
+    progress_visualisation_examples = {"small": ds_128[rand_order], "big": ds_256[rand_order]}
+
+    if args.train_small:
+        dataloader_128 = ImageLoader(ds_128, batch_size=CONFIG.batch_128)
+        train_small_model(diffusion, model_small, dataloader_128, progress_visualisation_examples["small"])
+
+    if args.pretrain_big:
+        state_dict_128_path = CONFIG.small_model_checkpoint
+        assert state_dict_128_path.exists(), 'Trained small model checkpoint does not exist.'
+        model_small.load_state_dict(torch.load(state_dict_128_path))
+        pretrain_big_model(diffusion, model_big, model_small, ds_128, ds_256, progress_visualisation_examples["big"])
+
+    if args.fine_tune_big:
+        state_dict_pretrained_path = CONFIG.big_model_pretrained_checkpoint
+        assert state_dict_pretrained_path.exists(), 'Pretrained big model checkpoint does not exist.'
+        model_big.load_state_dict(torch.load(state_dict_pretrained_path))
+        fine_tune_big_model(diffusion, model_big, ds_256, progress_visualisation_examples["big"])
+
+        print('Training finished, extracting codes for later use...')
+        extract_codes(model_big, diffusion, ds_256)
 
 
 if __name__ == "__main__":
