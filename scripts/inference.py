@@ -77,7 +77,7 @@ def main():
     diffusion.std = images.std(dim=(0, 2, 3))
     diffusion.mean = images.mean(dim=(0, 2, 3))
 
-    training_vectors = torch.load(RESULT_DIR / 'training_vectors.pt')
+    training_vectors = torch.load(RESULT_DIR / 'training_codes.pt')
     sampler = RejectionSampling(training_vectors, config.sample_threshold)
 
     negative_images, positive_images = generate_images(config, model, diffusion, images, labels, sampler=sampler)

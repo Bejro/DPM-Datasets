@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional, Union, List, Any
+from typing import Optional, Union, List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,9 +21,12 @@ SAVE_DIR = Path(__file__).parent.parent / 'src/checkpoints'
 RESULT_DIR = Path(__file__).parent.parent / 'results'
 
 
-def _diffuse_and_step(diffusion: Diffusion, model: Autoencoder, optimizer: optim, images, labels) -> torch.Tensor:
+def _diffuse_and_step(
+        diffusion: Diffusion, model: Autoencoder, optimizer: optim,
+        images: torch.Tensor, labels: torch.Tensor, device: Union[torch.device, str] = 'cuda'
+) -> torch.Tensor:
 
-    a = diffusion.sample_angles(images.shape[0]).to(model.device)
+    a = diffusion.sample_angles(images.shape[0]).to(device)
     if CONFIG.use_blur:
         images = diffusion.blur(images, 1 - (a - 3) / 177).real
 
@@ -43,13 +46,10 @@ def _diffuse_and_step(diffusion: Diffusion, model: Autoencoder, optimizer: optim
 def train_modules(
         diffusion: Diffusion, model: Autoencoder, optimizer: optim,
         images: torch.Tensor, labels: Optional[torch.Tensor] = None,
-        encoder: bool = True, decoder: bool = True
+        encoder: bool = True, decoder: bool = True, device: Union[torch.device, str] = 'cuda'
 ) -> torch.Tensor:
-    def _train_on_batch(
-            diffusion: Diffusion, model: Autoencoder, optimizer: optim,
-            images: torch.Tensor, labels: Optional[Any] = None
-    ):
-        device = model.device
+    def _train_on_batch():
+        nonlocal images
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)
         images = images.to(device)
 
@@ -60,11 +60,9 @@ def train_modules(
                 torch.randn(len(images), 512).to(device) / 100 if np.random.random() < 0.5 else 0)
         return _diffuse_and_step(diffusion, model, optimizer, images, labels)
 
-    def _train_u_on_batch(
-            diffusion: Diffusion, model: Autoencoder, optimizer: optim,
-            images: torch.Tensor, labels: torch.Tenosr
-    ):
-        device = model.device
+    def _train_u_on_batch():
+        nonlocal images
+        nonlocal labels
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)
         images = images.to(device)
         labels = labels.to(device)
@@ -75,11 +73,9 @@ def train_modules(
             labels = labels + (torch.randn(len(images), 512).to(device) / 100 if np.random.random() < 0.5 else 0)
         return _diffuse_and_step(diffusion, model, optimizer, images, labels)
 
-    def _train_c_on_batch(
-            diffusion: Diffusion, model: Autoencoder, optimizer: optim,
-            images: torch.Tensor, labels: torch.Tenosr
-    ):
-        device = model.device
+    def _train_c_on_batch():
+        nonlocal images
+        nonlocal labels
         mse = nn.MSELoss()
         images = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(images)
         images = images.to(device)
@@ -94,13 +90,13 @@ def train_modules(
         return loss.item()
 
     if encoder and decoder:
-        return _train_on_batch(diffusion, model, optimizer, images)
+        return _train_on_batch()
     elif encoder:
         assert labels is not None
-        return _train_c_on_batch(diffusion, model, optimizer, images, labels)
+        return _train_c_on_batch()
     else:
         assert labels is not None
-        return _train_u_on_batch(diffusion, model, optimizer, images, labels)
+        return _train_u_on_batch()
 
 
 def train(
@@ -155,7 +151,7 @@ def log_reco_results(
     imgs_n = torchvision.transforms.Normalize(diffusion.mean, diffusion.std)(imgs)
     n = len(imgs)
 
-    sampled_images = diffusion.sample(model, n=n, angle_step=2, images=imgs_n.to(model.device)).clip(*CONFIG.img_window)
+    sampled_images = diffusion.sample(model, n=n, angle_step=2, images=imgs_n).clip(*CONFIG.img_window)
     _, axs = plt.subplots(2, n, figsize=(2 * n, 4), sharex='all')
     for i, ax in enumerate(axs.T):
         ax[1].imshow(sampled_images[i, 0], cmap='gray', vmin=-1000, vmax=1000)

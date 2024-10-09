@@ -1,10 +1,11 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from tqdm import tqdm
+import torch.nn.functional as F
 import torchvision
 from torch import optim
 import torch
@@ -16,7 +17,7 @@ from src.diffusion import Diffusion
 from src.models import Autoencoder
 from scripts.configs import TrainConfig
 
-CONFIG = TrainConfig
+CONFIG = TrainConfig(Path(), Path())
 DEVICE = CONFIG.device
 RESULT_DIR = Path(__file__).parent.parent / 'results'
 
@@ -27,13 +28,14 @@ if CONFIG.device_id is not None:
 
 def load_data_for_training(
         begin: Optional[int] = None, end: Optional[int] = None, org_res: Optional[int] = None
-) -> Tuple[torch.Tensor, ...]:
+) -> (torch.Tensor, torch.Tensor):
     begin = begin or CONFIG.ds_id_first
     end = end or CONFIG.ds_id_last
     org_res = org_res or CONFIG.img_res
 
-    res = [load_data(CONFIG.ds_path, CONFIG.ds_meta, begin, end, org_res, px)[0] for px in [128, 256]]
-    return tuple(res)
+    ds_256 = load_data(CONFIG.ds_path, CONFIG.ds_meta, begin, end, org_res, 256)[0]
+    ds_128 = F.interpolate(ds_256, size=128, mode='nearest')
+    return ds_128, ds_256
 
 
 def init_models(images: torch.Tensor) -> (Autoencoder, Autoencoder, Diffusion):
@@ -58,9 +60,7 @@ def prepare_or_train_small_model(
         small_model.load_state_dict(torch.load(state_dict_128_path))
         print('Small model loaded from ckpt.')
     else:
-        # model_128.load_state_dict(torch.load(state_dict_128_path))
         print('training small model...')
-
         train(
             diffusion, small_model, dataloader, optimizer, CONFIG.small_model_epochs,
             use_ema=True, is_supervised=False,

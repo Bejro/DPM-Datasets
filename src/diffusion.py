@@ -101,7 +101,7 @@ class Diffusion:
         model.eval()
         img = None
         with torch.no_grad():
-            labels = model.classif(images) if labels is None else labels
+            labels = model.classif(images.to(self.device)) if labels is None else labels.to(self.device)
             x = torch.randn((n, 1, self.img_size, self.img_size)).to(self.device)
             for a in tqdm(range(init_angle, 180 + 1 - skip_last_angles, angle_step), position=0):
                 t = self.t_of_a(torch.tensor(a)) * torch.ones(n).to(self.device)

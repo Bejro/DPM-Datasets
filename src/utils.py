@@ -1,6 +1,5 @@
 import csv
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional, Tuple, Union, Any, List
 from zipfile import ZipFile
@@ -11,7 +10,6 @@ import torch
 import torchvision
 from scipy import stats
 from torch import nn
-from torch.utils.data import Sampler
 from tqdm import tqdm
 import torch.nn.functional as F
 import faiss
@@ -45,14 +43,6 @@ def load_data(
     x_path = []
     labels = []
 
-    def process_image(idx: int, archive: ZipFile, x_path: List[List[str]], labels: List[int]) -> (torch.Tensor, int):
-        path = get_path(x_path[idx])
-        img = get_arr(archive, path)
-        assert img.shape == (512, 512)
-        img_tensor = torch.tensor(img)
-        label = labels[idx]
-        return img_tensor, label
-
     with open(ds_meta, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         next(reader)
@@ -63,11 +53,12 @@ def load_data(
     ds_x = torch.zeros(end - begin, org_res, org_res)
     ds_y = torch.zeros(end - begin)
 
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        futures = [executor.submit(process_image, i, archive, x_path, labels) for i in range(begin, end)]
-
-    for i, future in tqdm(enumerate(as_completed(futures)), desc="Loading images", total=end - begin):
-        img_tensor, label = future.result()
+    for i, idx in tqdm(enumerate(range(begin, end)), desc="Loading images", total=end - begin):
+        path = get_path(x_path[idx])
+        img = get_arr(archive, path)
+        assert img.shape == (512, 512)
+        img_tensor = torch.tensor(img)
+        label = labels[idx]
         ds_x[i] = img_tensor
         ds_y[i] = label
 
